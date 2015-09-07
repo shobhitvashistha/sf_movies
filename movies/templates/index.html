@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html>
+  
+  <head>
+  	<title>San Francisco Movie Locations</title>
+  	<link href="/media/bootstrap.min.css" rel="stylesheet">
+  	<!-- link href="/media/bootstrap-theme.min.css" rel="stylesheet" -->
+    <style type="text/css">
+      html, body {
+      	height: 100%;
+      	margin: 0;
+      	padding: 0;
+      }
+      
+      #map {
+      	height: 100%;
+      }
+      
+      #inputbox {
+      	position: absolute;
+      	padding: 26px;
+      	left: 60px;
+      }
+      
+      #infobox {
+      	position: absolute;
+      	width: 300px;
+      	background-color: white;
+      	overflow: hidden;
+      	z-index: 99;
+      }
+      
+      #infobox div {
+      	margin-left: 15px;
+      	margin-right: 15px;
+      	margin-bottom: 15px;
+      	display: none;
+      }
+      
+      #inputbox input {
+      	width: 300px;
+      }
+      
+      .tt-menu {
+      	width: 300px;
+      	background-color: white;
+      	padding: 10px;
+      	border: 1px solid #ccc;
+      }
+    </style>
+    
+  </head>
+  
+  <body>
+   	<div id="inputbox" class="input-group">
+   		<input class="form-control" type="text" placeholder="Movies shot in San Francisco">
+   		<div id="infobox">
+   		<div></div>
+   		</div>
+   	</div><!-- /input-group -->
+   	
+   	<div id="map"></div>
+    
+    <script type="text/javascript">
+    	// display map
+		var map;
+		function initMap() {
+		  map = new google.maps.Map(document.getElementById('map'), {
+		    center: {
+		    	lat: {{ center.lat }},
+		    	lng: {{ center.lng }}
+		    },
+		    zoom: 12
+		  });
+		}
+	</script>
+	
+	<script src="/media/jquery-1.10.2.min.js"></script>
+    <script src="/media/typeahead.bundle.js"></script>
+    
+	<script type="text/javascript">
+		// autocomplete
+		var movies = {{ movies_list|safe }};
+		var movies_sug = new Bloodhound({
+			datumTokenizer: Bloodhound.tokenizers.obj.whitespace('title'),
+			queryTokenizer: Bloodhound.tokenizers.whitespace,
+			local: movies
+		});
+
+		$('#inputbox .form-control').typeahead({
+			hint: true,
+			highlight: true,
+			minLength: 1
+		}, {
+			name: 'movies',
+			displayKey: 'title',
+			limit: 10,
+			source: movies_sug
+		}).bind("typeahead:selected", function(obj, datum, name) {
+			var url = '/movie/' + datum.id;
+			$.ajax({
+				'url': url,
+			    'type': 'GET',
+			    'dataType': 'json',
+			    'success': function(data) {
+			    	console.log('success');
+			    	showGoogleMarkers(data);
+			    	showMovieInfo(data);
+			    },
+			    'error': function(data) {
+			    	console.log('error');
+			    }
+			});
+		});
+		
+		var markers = [];
+		
+		function showGoogleMarkers(data) {
+			var locations = data.locations;
+			var locLength = locations.length;
+			
+			for (var i = 0; i < markers.length; i++) {
+				markers[i].setMap(null);
+			}
+			
+			markers = [];
+			
+			for (var i = 0; i < locLength; i++) {
+				var loc = locations[i];
+				var marker = new google.maps.Marker({
+				    position: {lat: loc.latitude, lng: loc.longitude},
+				    map: map,
+				    title: loc.location
+				});	
+				markers.push(marker);
+			}
+		}
+		
+		function showMovieInfo(data) {
+			var movie = data.movie;
+			var htmlStr = "<h3>" + movie.title + "</h3><i>"
+			if (movie.director != null) {
+				htmlStr = htmlStr + "<p><b>Director: </b>" + movie.director + "</p>";
+			}
+			if (movie.writer != null) {
+				htmlStr = htmlStr + "<p><b>Writer: </b>" + movie.writer + "</p>";
+			}
+			if (movie.production_company != null) {
+				htmlStr = htmlStr + "<p><b>Production Company: </b>" + movie.production_company + "</p>";
+			}
+			if (movie.distributor != null) {
+				htmlStr = htmlStr + "<p><b>Distributor: </b>" + movie.distributor + "</p>";
+			}
+			if (movie.actors.length != 0) {
+				htmlStr = htmlStr + "<p><b>Actors: </b>" + movie.actors.join(', ') + "</p>";
+			}
+			if (data.locations.length != 0) {
+				htmlStr = htmlStr + "<p style='font-size: 85%; text-align: right;'>" + data.locations.length + " Locations</p>";
+			} else {
+				htmlStr = htmlStr + "<p style='font-size: 85%; text-align: right;'>Locations Unknown</p>";
+			}
+			htmlStr = htmlStr + "</i>";
+			$('#infobox div').show();	
+			$('#infobox div').html(htmlStr);
+		}
+    </script>
+    
+    <script async defer
+      src="https://maps.googleapis.com/maps/api/js?key={{ api_key }}&callback=initMap">
+    </script>
+    
+  </body>
+</html>
